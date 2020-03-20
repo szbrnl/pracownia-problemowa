@@ -1,1 +1,1 @@
-# pracownia-problemowa
+# pracownia problemowa
