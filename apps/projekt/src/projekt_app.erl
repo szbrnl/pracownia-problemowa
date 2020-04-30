@@ -5,14 +5,21 @@
 
 -module(projekt_app).
 
--behaviour(application).
+-behaviour(gen_server).
 
--export([start/2, stop/1]).
+-export([start_link/1, init/1]).
 
-start(_StartType, _StartArgs) ->
-    projekt_sup:start_link().
+start_link(InitialValue) ->
+    gen_server:start_link(
+        {local,var_server},
+        var_server,
+        InitialValue, []).
 
-stop(_State) ->
-    ok.
+init(InitialValue) ->
+
+
+
+
+    {ok, InitialValue}.
 
 %% internal functions
