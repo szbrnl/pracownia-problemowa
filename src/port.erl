@@ -21,13 +21,12 @@ handle_call(_Request, _From, PortId) ->
 
 handle_cast({start, _Request}, PortId) ->
   io:format(PortId),
-  io:format("~s", [_Request]),
   spawn_link(packet_pipeline, process_packet, [_Request, PortId]),
   {noreply, PortId};
 
 handle_cast({processed, _Request}, PortId) ->
   io:format(PortId),
-  io:format("~s", [_Request]),
+  io:nl(),
   gen_server:cast(ping1, {pong, _Request}),
   {noreply, PortId}.
 

@@ -1,4 +1,3 @@
-
 -module(ports_supervisor).
 
 -behaviour(supervisor).
@@ -20,4 +19,5 @@ init([]) ->
 
 %% ports_supervisor:start_link().
 
-%% gen_server:cast(ping1, {ping, ala}).
+%% gen_server:cast(ping1, {ping, [a,l,a]}).
+%% gen_server:cast(ping1, {fix_ping}).
