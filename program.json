@@ -36,7 +36,7 @@
       "fields" : [
         ["dst_addr", 48, false],
         ["src_addr", 48, false],
-        ["ether_type", 16, false]
+        ["packet_rest", 1000, false]
       ]
     }
   ],

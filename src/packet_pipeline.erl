@@ -1,6 +1,6 @@
 -module(packet_pipeline).
 
--export([process_packet/2]).
+-export([process_packet/2, process_packet/3]).
 
 -define(Headers, <<"headers">>).
 -define(Metadata, <<"metadata">>).
@@ -16,11 +16,27 @@
 -define(Value, <<"value">>).
 
 process_packet(Packet, PortId) ->
+  Binary = process_packet_fun(Packet),
+  gen_server:cast(PortId, {processed, Binary}),
+  ok.
+
+process_packet(Packet, PortId, Callback) ->
+  Processed = process_packet_fun(Packet),
+  gen_server:cast(PortId, {processed, Processed, Callback}).
+
+process_packet_fun(Packet) ->
   io:format("processing packet"),
   Parsed = parse_packet(Packet),
+  error_logger:info_report([parsed, Parsed]),
   Processed = process_packet(Parsed),
-  gen_server:cast(PortId, {processed, Processed}),
-  ok.
+  Binary = packet_to_bin(Processed),
+  Binary.
+
+packet_to_bin(Packet) ->
+  FieldsOrder = maps:get(fields_order, Packet),
+  [{_, Data}] = maps:to_list(maps:remove(fields_order, Packet)),
+  Result = lists:foldl(fun(Name, Binary) -> Binary ++ [maps:get(Name, Data)] end, [], FieldsOrder),
+  Result.
 
 parse_packet(Packet) ->
   Config = config_parser:parse_config(),
@@ -39,8 +55,7 @@ create_packet_with_struct(Config, Packet) ->
                               end, Headers),
 
   Header_types = maps:get(?Header_types, Config),
-
-  fill_struct_with_packet(PacketStruct, #{}, Header_types, Packet).
+  fill_struct_with_packet(PacketStruct, #{fields_order => []}, Header_types, Packet).
 
 fill_struct_with_packet([], Acc, _, _) ->
   Acc;
@@ -57,14 +72,21 @@ fill_struct_with_packet([H | T], Map, Header_types, Packet) ->
 
   FieldsList = maps:get(?Fields, Fields),
   {FieldsMap, PacketR} = lists:foldl(fun([Name, Size, _], {Acc, PacketRest}) ->
-    UpdatedAcc = Acc#{Name => lists:sublist(PacketRest, Size)},
-    UpdatedPacket = lists:subtract(PacketRest, lists:sublist(PacketRest, Size)),
-    {UpdatedAcc, UpdatedPacket}
+    if
+      (bit_size(PacketRest) =< Size) ->
+        {Acc#{Name => PacketRest}, <<>>};
+      true ->
+        BinarySize = Size div 8,
+        <<PacketRestH: BinarySize/binary, PacketRestT/binary>> = PacketRest,
+        UpdatedAcc = Acc#{Name => PacketRestH},
+        {UpdatedAcc, PacketRestT}
+    end
                                      end, {#{}, Packet}, FieldsList),
 
-  Finish = Map#{maps:get(?Name, H) => FieldsMap},
-
-  fill_struct_with_packet(T, Finish, Header_types, PacketR).
+  UpdatedWithFields = Map#{maps:get(?Name, H) => FieldsMap},
+  FieldsListNames = lists:map(fun([Name, _, _]) -> Name end, FieldsList),
+  UpdatedWithFieldsOrder = UpdatedWithFields#{fields_order => maps:get(fields_order, UpdatedWithFields) ++ FieldsListNames},
+  fill_struct_with_packet(T, UpdatedWithFieldsOrder, Header_types, PacketR).
 
 
 process_packet(Packet_with_struct) ->

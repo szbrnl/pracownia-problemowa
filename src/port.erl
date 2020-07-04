@@ -24,10 +24,23 @@ handle_cast({start, _Request}, PortId) ->
   spawn_link(packet_pipeline, process_packet, [_Request, PortId]),
   {noreply, PortId};
 
+handle_cast({start, _Request, Callback}, PortId) ->
+  io:format(PortId),
+  spawn_link(packet_pipeline, process_packet, [_Request, PortId, Callback]),
+  {noreply, PortId};
+
 handle_cast({processed, _Request}, PortId) ->
   io:format(PortId),
   io:nl(),
-  gen_server:cast(ping1, {pong, _Request}),
+  {ok, Pid1} = epcap:start_link([{interface, "veth8"}, {inject, true}]),
+  epcap:send(Pid1, _Request),
+%%  gen_server:cast(ping1, {pong, _Request}),
+  {noreply, PortId};
+
+handle_cast({processed, _Request, Callback}, PortId) ->
+  io:format(PortId),
+  io:nl(),
+  Callback(_Request),
   {noreply, PortId}.
 
 handle_info(_Info, State) ->
